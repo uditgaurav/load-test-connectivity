@@ -330,6 +330,35 @@
 </div>
 <p class="sub" style="margin-top:16px">Skip Cloud Interconnect and Direct Connect. They need physical hardware and long lead times, so they are not worth it for load testing.</p>
 
+<!-- ============ Q&A ============ -->
+<h2>Common questions</h2>
+
+<h3 style="font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:22px;margin:24px 0 0">Why doesn't NAT work for private IPs?</h3>
+<p class="sub">NAT only rewrites the source address of traffic going out to the internet. It does not create a route to the destination.</p>
+<ul class="sub">
+  <li>A private address such as <code>10.1.2.3</code> is not routable on the internet. Internet routers drop packets sent to it.</li>
+  <li>That address lives inside the customer's network. From our side it is either unreachable or collides with a 10.x address in our own VPC, because these ranges are reused everywhere.</li>
+  <li>The packet never reaches the customer's firewall, so no allowlist rule can help.</li>
+  <li>A private target needs a path into the customer's network: a tunnel (Tailscale) or a private link (Private Service Connect).</li>
+</ul>
+
+<h3 style="font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:22px;margin:24px 0 0">Which option covers both private and public endpoints?</h3>
+<p class="sub">No single option covers everything well. Choose the path per endpoint.</p>
+<table>
+  <tr><th>Endpoint</th><th>Path</th></tr>
+  <tr><td>Public IP or DNS</td><td>Cloud NAT with static IPs</td></tr>
+  <tr><td>Private, anywhere (on-prem, AWS, other clouds, GCP)</td><td>Tailscale subnet router</td></tr>
+  <tr><td>Private, on Google Cloud</td><td>Private Service Connect</td></tr>
+</table>
+<p class="sub" style="margin-top:12px">If you want one private option for every customer, it is Tailscale, because it works on any cloud or on-prem. Private Service Connect only works when the customer's app is on Google Cloud.</p>
+
+<h3 style="font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:22px;margin:24px 0 0">What is recommended for production?</h3>
+<ol class="sub">
+  <li><strong>Cloud NAT with static IPs</strong> is the primary path for public endpoints. It is simple, the customer only adds an allowlist rule, and it scales with NAT IPs and ports per VM.</li>
+  <li><strong>Private Service Connect</strong> is the production choice for private apps on Google Cloud. It has no single bottleneck and needs no IP allowlist.</li>
+  <li><strong>Tailscale</strong> is the universal private path for everyone else. Watch its throughput limit in production: run more than one subnet router if needed, and load test the tunnel itself.</li>
+</ol>
+
 <!-- ============ COMPARISON ============ -->
 <h2>Which option when</h2>
 <table>
