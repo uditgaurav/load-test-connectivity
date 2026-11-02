@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Load test connectivity: how traffic reaches the customer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{--paper:#f5f4ed;--paper2:#ebe9df;--ink:#141413;--muted:#5f6670;--accent:#b8400a;--accent-tint:#f3dccd;--hair:#c9c7bc;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:"Geist",-apple-system,"Helvetica Neue",Arial,sans-serif;line-height:1.5}
+  main{max-width:1080px;margin:0 auto;padding:48px 20px 72px}
+  h1{font-family:"Instrument Serif",Georgia,serif;font-weight:400;font-size:40px;margin:0 0 4px}
+  h2{font-family:"Instrument Serif",Georgia,serif;font-weight:400;font-size:28px;margin:56px 0 4px}
+  .sub{color:var(--muted);margin:0 0 20px;max-width:760px}
+  .tag{font-family:"Geist Mono",ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+  svg{width:100%;height:auto;display:block;background:var(--paper);border:1px solid var(--hair);border-radius:8px}
+  svg text{font-family:"Geist",-apple-system,"Helvetica Neue",Arial,sans-serif}
+  .n{font-size:13px;font-weight:600;fill:var(--ink)}
+  .s{font-family:"Geist Mono",ui-monospace,Menlo,monospace !important;font-size:10.5px;fill:var(--muted)}
+  .z{font-family:"Geist Mono",ui-monospace,Menlo,monospace !important;font-size:10px;letter-spacing:.1em;fill:var(--muted)}
+  .l{font-family:"Geist Mono",ui-monospace,Menlo,monospace !important;font-size:10.5px;fill:var(--ink)}
+  .la{font-family:"Geist Mono",ui-monospace,Menlo,monospace !important;font-size:10.5px;fill:var(--accent)}
+  .t{font-family:"Instrument Serif",Georgia,serif !important;font-size:20px;fill:var(--ink)}
+  .i{font-family:"Instrument Serif",Georgia,serif !important;font-style:italic;font-size:14px;fill:var(--accent)}
+  .box{fill:var(--paper2);stroke:var(--hair);stroke-width:1}
+  .foc{fill:var(--accent-tint);stroke:var(--accent);stroke-width:1}
+  .zone{fill:none;stroke:var(--hair);stroke-width:1;stroke-dasharray:4 4}
+  .ln{stroke:var(--ink);stroke-width:1;fill:none}
+  .la-ln{stroke:var(--accent);stroke-width:1.5;fill:none}
+  .dash{stroke:var(--muted);stroke-width:1;fill:none;stroke-dasharray:4 4}
+  .dash-a{stroke:var(--accent);stroke-width:1;fill:none;stroke-dasharray:4 4}
+  ol,ul{padding-left:20px;margin:8px 0}
+  li{margin:4px 0}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:16px}
+  .card{border:1px solid var(--hair);border-radius:8px;padding:16px 20px;background:var(--paper2)}
+  .card b{font-family:"Instrument Serif",Georgia,serif;font-weight:400;font-size:20px}
+  table{border-collapse:collapse;width:100%;margin-top:16px;font-size:14px}
+  th,td{border-bottom:1px solid var(--hair);padding:8px 12px;text-align:left;vertical-align:top}
+  th{font-family:"Geist Mono",ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500}
+  code{font-family:"Geist Mono",ui-monospace,Menlo,monospace;font-size:12.5px;background:var(--paper2);padding:1px 5px;border-radius:4px}
+</style>
+</head>
+<body>
+<main>
+
+<div class="tag">Load testing · Connectivity</div>
+<h1>How load test traffic reaches the customer</h1>
+<p class="sub">Managed infrastructure generates the load. Traffic always leaves from our side. The customer only decides whether and how to let it in.</p>
+
+<!-- ============ DIAGRAM 1 ============ -->
+<h2>1. Default: public egress through NAT</h2>
+<p class="sub">The customer allows our static NAT IPs on their app port. They do not allowlist load pod IPs, and they do not allowlist their own IPs.</p>
+
+<svg viewBox="0 0 1040 452" role="img" aria-labelledby="d1t d1d">
+  <title id="d1t">Public egress via NAT</title>
+  <desc id="d1d">User submits a script to Load Test Manager, which calls K8s-IFS, which starts a DDCR pod, which launches load pods. Load pods send traffic out through a static NAT IP across the internet to the customer firewall, which allows that IP on the app port, then to the customer endpoints. Responses return on the same connection.</desc>
+  <defs>
+    <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#141413"/></marker>
+    <marker id="a1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b8400a"/></marker>
+    <marker id="a1m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5f6670"/></marker>
+  </defs>
+
+  <text x="24" y="36" class="t">Public egress via NAT</text>
+
+  <!-- zones -->
+  <rect x="24" y="64" width="568" height="364" rx="8" class="zone"/>
+  <text x="40" y="88" class="z">HARNESS MANAGED INFRA · PRIVATE VPC</text>
+  <rect x="704" y="64" width="312" height="364" rx="8" class="zone"/>
+  <text x="720" y="88" class="z">CUSTOMER QA ENVIRONMENT</text>
+
+  <!-- our nodes -->
+  <rect x="40" y="108" width="128" height="64" rx="6" class="box"/>
+  <text x="104" y="136" text-anchor="middle" class="n">User</text>
+  <text x="104" y="154" text-anchor="middle" class="s">script + endpoints</text>
+
+  <rect x="216" y="108" width="128" height="64" rx="6" class="box"/>
+  <text x="280" y="136" text-anchor="middle" class="n">Load Test Manager</text>
+  <text x="280" y="154" text-anchor="middle" class="s">save · run · results</text>
+
+  <rect x="392" y="108" width="168" height="64" rx="6" class="box"/>
+  <text x="476" y="136" text-anchor="middle" class="n">K8s-IFS service</text>
+  <text x="476" y="154" text-anchor="middle" class="s">→ NG Manager → delegate</text>
+
+  <rect x="392" y="228" width="168" height="64" rx="6" class="box"/>
+  <text x="476" y="256" text-anchor="middle" class="n">DDCR / DDCI pod</text>
+  <text x="476" y="274" text-anchor="middle" class="s">launches load pods</text>
+
+  <rect x="216" y="228" width="128" height="64" rx="6" class="box"/>
+  <text x="280" y="256" text-anchor="middle" class="n">Load pods</text>
+  <text x="280" y="274" text-anchor="middle" class="s">10.x private IPs</text>
+
+  <rect x="216" y="348" width="200" height="64" rx="6" class="foc"/>
+  <text x="316" y="376" text-anchor="middle" class="n">NAT · static egress IPs</text>
+  <text x="316" y="394" text-anchor="middle" class="s">202.45.1.1:&lt;random src port&gt;</text>
+
+  <!-- our arrows -->
+  <path d="M168,140 H216" class="ln" marker-end="url(#a1)"/>
+  <path d="M344,140 H392" class="ln" marker-end="url(#a1)"/>
+  <path d="M476,172 V228" class="ln" marker-end="url(#a1)"/>
+  <path d="M392,260 H344" class="ln" marker-end="url(#a1)"/>
+  <path d="M280,292 V348" class="ln" marker-end="url(#a1)"/>
+
+  <!-- customer nodes -->
+  <rect x="736" y="108" width="248" height="64" rx="6" class="box"/>
+  <text x="860" y="136" text-anchor="middle" class="n">Customer admin</text>
+  <text x="860" y="154" text-anchor="middle" class="s">adds the allow rule, once</text>
+
+  <rect x="736" y="212" width="248" height="100" rx="6" class="box"/>
+  <text x="860" y="238" text-anchor="middle" class="n">App endpoints (5-6)</text>
+  <text x="860" y="258" text-anchor="middle" class="s">api.qa.example.com :443</text>
+  <text x="860" y="274" text-anchor="middle" class="s">10.0.1.10 :8080</text>
+  <text x="860" y="290" text-anchor="middle" class="s">... ports from the script</text>
+
+  <rect x="736" y="348" width="248" height="64" rx="6" class="foc"/>
+  <text x="860" y="372" text-anchor="middle" class="n">Firewall / WAF / SG / ingress</text>
+  <text x="860" y="394" text-anchor="middle" class="la">allow src 202.45.1.1/32 → tcp 443</text>
+
+  <!-- crossing arrows -->
+  <path d="M416,368 H736" class="la-ln" marker-end="url(#a1a)"/>
+  <path d="M736,396 H416" class="dash" marker-end="url(#a1m)"/>
+  <text x="648" y="360" text-anchor="middle" class="la">dst :443</text>
+  <text x="648" y="414" text-anchor="middle" class="s">replies</text>
+  <text x="648" y="440" text-anchor="middle" class="s" style="font-size:10px">public internet</text>
+
+  <path d="M860,348 V312" class="ln" marker-end="url(#a1)"/>
+  <!-- admin to firewall -->
+  <path d="M984,140 H1000 V380 H984" class="dash-a" marker-end="url(#a1a)"/>
+
+  <text x="1004" y="260" class="i" transform="rotate(90 1004 260)" text-anchor="middle">opens port for our IPs</text>
+</svg>
+
+<div class="grid">
+  <div class="card">
+    <b>Request path</b>
+    <ol>
+      <li>User saves a script listing 5-6 endpoints and ports.</li>
+      <li>Load Test Manager hands the run to K8s-IFS.</li>
+      <li>K8s-IFS dispatches the DDCI manifest through NG Manager. The delegate applies it in the project namespace, and DDCR launches the load pods.</li>
+      <li>Load pods send requests. NAT rewrites the source to our static public IP.</li>
+      <li>Customer firewall sees that IP, matches the allow rule, forwards to the endpoint.</li>
+      <li>Responses come back on the same connection. Metrics flow back to Load Test Manager.</li>
+      <li>Run ends, traffic stops, final report goes to the user.</li>
+    </ol>
+  </div>
+  <div class="card">
+    <b>What the customer opens</b>
+    <ul>
+      <li><strong>Source:</strong> our NAT public IPs (all of them, if more than one).</li>
+      <li><strong>Destination port:</strong> whatever each endpoint listens on (443, 8080, ...).</li>
+      <li><strong>Not needed:</strong> load pod private IPs, our source ports (random, per connection), any inbound rule toward us.</li>
+      <li><strong>Also ask for:</strong> WAF and rate-limit exemption, because all load comes from a few IPs.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <b>What we must guarantee</b>
+    <ul>
+      <li>Static, published egress IPs. Notice before any change.</li>
+      <li>Enough NAT IPs and ports (SNAT exhaustion causes timeouts under heavy load).</li>
+      <li>A test-identifying header (for example <code>X-Load-Test: run-id</code>) so the customer can filter.</li>
+      <li>Limit: this only works when the endpoints are reachable from the internet.</li>
+    </ul>
+  </div>
+</div>
+
+<h3 style="font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:22px;margin:32px 0 0">Ports in detail</h3>
+<table>
+  <tr><th>Port</th><th>Example</th><th>Who picks it</th><th>Customer action</th></tr>
+  <tr><td><strong>Destination port</strong></td><td><code>443</code>, <code>8080</code>, <code>8443</code></td><td>Customer app. We read it from the endpoints in the user's script.</td><td>Open it for our NAT IPs. One rule per distinct port.</td></tr>
+  <tr><td><strong>Source port</strong></td><td><code>1024-65535</code></td><td>Load pod, then remapped by our NAT. Random per connection.</td><td>None. Never allowlist it. Firewall rules say "any source port".</td></tr>
+  <tr><td><strong>Return traffic</strong></td><td>reply to NAT IP:source port</td><td>Customer app, over the same connection.</td><td>None. Stateful firewalls allow replies automatically.</td></tr>
+</table>
+<p class="sub" style="margin-top:12px">Example customer rule: <code>allow tcp from 202.45.1.1/32 to &lt;endpoint&gt; ports 443, 8080</code>. If the script has endpoints on three different ports, the customer opens those three ports, for our NAT IPs only.</p>
+
+<!-- ============ DIAGRAM 2 ============ -->
+<h2>2. Private endpoints: Tailscale subnet router</h2>
+<p class="sub">For apps with private IPs, on-prem, or clouds other than AWS or GCP. The customer dials out, so they open no inbound port.</p>
+
+<svg viewBox="0 0 1040 276" role="img" aria-labelledby="d2t d2d">
+  <title id="d2t">Tailscale subnet router connectivity</title>
+  <desc id="d2d">Load pods send traffic to a tailnet peer in Harness cloud. A WireGuard tunnel dialed out by the customer's subnet router carries it into the customer's private network, which advertises its CIDR range.</desc>
+  <defs>
+    <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#141413"/></marker>
+    <marker id="a2a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b8400a"/></marker>
+  </defs>
+  <text x="24" y="36" class="t">Tailscale subnet router</text>
+
+  <rect x="24" y="64" width="400" height="168" rx="8" class="zone"/>
+  <text x="40" y="88" class="z">HARNESS CLOUD</text>
+  <rect x="616" y="64" width="400" height="168" rx="8" class="zone"/>
+  <text x="632" y="88" class="z">CUSTOMER NETWORK (PRIVATE)</text>
+
+  <rect x="40" y="112" width="140" height="64" rx="6" class="box"/>
+  <text x="110" y="140" text-anchor="middle" class="n">Load pods</text>
+  <text x="110" y="158" text-anchor="middle" class="s">targets private IPs</text>
+
+  <rect x="232" y="112" width="176" height="64" rx="6" class="box"/>
+  <text x="320" y="140" text-anchor="middle" class="n">Tailnet peer</text>
+  <text x="320" y="158" text-anchor="middle" class="s">our side of the tailnet</text>
+
+  <rect x="632" y="112" width="176" height="64" rx="6" class="foc"/>
+  <text x="720" y="140" text-anchor="middle" class="n">Subnet router</text>
+  <text x="720" y="158" text-anchor="middle" class="s">advertises 10.1.0.0/16</text>
+
+  <rect x="840" y="112" width="160" height="64" rx="6" class="box"/>
+  <text x="920" y="140" text-anchor="middle" class="n">App endpoints</text>
+  <text x="920" y="158" text-anchor="middle" class="s">10.1.x.x :ports</text>
+
+  <path d="M180,144 H232" class="ln" marker-end="url(#a2)"/>
+  <path d="M408,144 H632" class="la-ln" marker-start="url(#a2a)" marker-end="url(#a2a)"/>
+  <path d="M808,144 H840" class="ln" marker-end="url(#a2)"/>
+
+  <text x="520" y="130" text-anchor="middle" class="la">encrypted WireGuard tunnel</text>
+  <text x="520" y="166" text-anchor="middle" class="s">dialed out by customer</text>
+
+  <text x="320" y="204" text-anchor="middle" class="i">throughput ceiling</text>
+  <text x="720" y="204" text-anchor="middle" class="i">throughput ceiling</text>
+</svg>
+
+<div class="grid">
+  <div class="card">
+    <b>What the customer does</b>
+    <ul>
+      <li>Runs a subnet router in their network.</li>
+      <li>Advertises the CIDR ranges that hold the endpoints.</li>
+      <li>Allows outbound only: UDP (Tailscale default 41641) for a direct path, or TCP 443 to a relay as fallback. No inbound port and no IP allowlist.</li>
+      <li>App ports (443, 8080, ...) stay private. They are reached inside the tunnel, so nothing is opened to the internet.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <b>Trade-off</b>
+    <ul>
+      <li>Good: easy to set up, quick to demo, works on-prem and on any cloud.</li>
+      <li>Bad: all load passes through the tailnet peer and subnet router. Past a point they become the bottleneck and add latency before the app reaches its limit.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============ DIAGRAM 3 ============ -->
+<h2>3. Private endpoints: AWS PrivateLink / GCP Private Service Connect</h2>
+<p class="sub">The customer's cloud provider builds a private lane. Best for heavy load, but only when the app already runs on AWS or GCP.</p>
+
+<svg viewBox="0 0 1040 276" role="img" aria-labelledby="d3t d3d">
+  <title id="d3t">PrivateLink or Private Service Connect connectivity</title>
+  <desc id="d3d">Load pods send traffic to a VPC endpoint in Harness cloud. It connects over the cloud provider backbone to an endpoint service in front of the customer's load balancer and app, with no public internet and no IP allowlist.</desc>
+  <defs>
+    <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#141413"/></marker>
+    <marker id="a3a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b8400a"/></marker>
+  </defs>
+  <text x="24" y="36" class="t">PrivateLink / Private Service Connect</text>
+
+  <rect x="24" y="64" width="400" height="168" rx="8" class="zone"/>
+  <text x="40" y="88" class="z">HARNESS CLOUD (CONSUMER VPC)</text>
+  <rect x="616" y="64" width="400" height="168" rx="8" class="zone"/>
+  <text x="632" y="88" class="z">CUSTOMER VPC (PROVIDER)</text>
+
+  <rect x="40" y="112" width="140" height="64" rx="6" class="box"/>
+  <text x="110" y="140" text-anchor="middle" class="n">Load pods</text>
+  <text x="110" y="158" text-anchor="middle" class="s">scale horizontally</text>
+
+  <rect x="232" y="112" width="176" height="64" rx="6" class="box"/>
+  <text x="320" y="140" text-anchor="middle" class="n">Interface endpoint</text>
+  <text x="320" y="158" text-anchor="middle" class="s">PrivateLink / PSC</text>
+
+  <rect x="632" y="112" width="176" height="64" rx="6" class="foc"/>
+  <text x="720" y="140" text-anchor="middle" class="n">Endpoint service + LB</text>
+  <text x="720" y="158" text-anchor="middle" class="s">customer approves us</text>
+
+  <rect x="840" y="112" width="160" height="64" rx="6" class="box"/>
+  <text x="920" y="140" text-anchor="middle" class="n">App endpoints</text>
+  <text x="920" y="158" text-anchor="middle" class="s">behind the LB</text>
+
+  <path d="M180,144 H232" class="ln" marker-end="url(#a3)"/>
+  <path d="M408,144 H632" class="la-ln" marker-start="url(#a3a)" marker-end="url(#a3a)"/>
+  <path d="M808,144 H840" class="ln" marker-end="url(#a3)"/>
+
+  <text x="520" y="130" text-anchor="middle" class="la">provider backbone</text>
+  <text x="520" y="166" text-anchor="middle" class="s">no public internet</text>
+
+  <text x="720" y="204" text-anchor="middle" class="i">no single bottleneck</text>
+</svg>
+
+<div class="grid">
+  <div class="card">
+    <b>What the customer does</b>
+    <ul>
+      <li>Puts a load balancer in front of the endpoints.</li>
+      <li>Publishes it as an endpoint service and approves our connection request.</li>
+      <li>The port is whatever the load balancer listener exposes (for example TCP 443). One listener per app port.</li>
+      <li>No IP allowlist, and no CIDR overlap problem.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <b>Trade-off</b>
+    <ul>
+      <li>Good: handles heavy traffic far better than a tunnel.</li>
+      <li>Bad: only for apps already in AWS or GCP, and adds a per-GB cost.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============ COMPARISON ============ -->
+<h2>Which option when</h2>
+<table>
+  <tr><th>Customer situation</th><th>Option</th><th>Customer opens</th><th>Scale</th></tr>
+  <tr><td>Public endpoints, IP restricted</td><td>NAT egress (default)</td><td>Allow our NAT IPs on app ports</td><td>High, bounded by NAT IPs and ports</td></tr>
+  <tr><td>Private, on-prem, or non AWS/GCP cloud</td><td>Tailscale subnet router</td><td>Outbound only from router</td><td>Medium, tunnel is the bottleneck</td></tr>
+  <tr><td>Private, app already in AWS or GCP</td><td>PrivateLink / PSC</td><td>Endpoint service + approval</td><td>Highest, extra per-GB cost</td></tr>
+  <tr><td>On-prem needing a dedicated line</td><td>Direct Connect / Interconnect</td><td>Physical circuit</td><td>Highest, but avoid: needs hardware</td></tr>
+</table>
+
+</main>
+</body>
+</html>
