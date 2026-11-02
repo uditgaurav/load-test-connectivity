@@ -90,7 +90,7 @@
   <text x="280" y="274" text-anchor="middle" class="s">10.x private IPs</text>
 
   <rect x="216" y="348" width="200" height="64" rx="6" class="foc"/>
-  <text x="316" y="376" text-anchor="middle" class="n">NAT · static egress IPs</text>
+  <text x="316" y="376" text-anchor="middle" class="n">Cloud NAT · static IPs</text>
   <text x="316" y="394" text-anchor="middle" class="s">202.45.1.1:&lt;random src port&gt;</text>
 
   <!-- our arrows -->
@@ -170,6 +170,16 @@
   <tr><td><strong>Return traffic</strong></td><td>reply to NAT IP:source port</td><td>Customer app, over the same connection.</td><td>None. Stateful firewalls allow replies automatically.</td></tr>
 </table>
 <p class="sub" style="margin-top:12px">Example customer rule: <code>allow tcp from 202.45.1.1/32 to &lt;endpoint&gt; ports 443, 8080</code>. If the script has endpoints on three different ports, the customer opens those three ports, for our NAT IPs only.</p>
+
+<h3 style="font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:22px;margin:32px 0 0">Is opening the destination port mandatory?</h3>
+<p class="sub">Not as a new step. The customer's app already listens on those ports. What matters is whether our traffic can already reach them.</p>
+<table>
+  <tr><th>Customer's current setup</th><th>Does the customer need to do anything?</th></tr>
+  <tr><td>Endpoint is public and open to the internet (for example <code>:443</code> for real users)</td><td><strong>No.</strong> The port is already open. Nothing to change. Only consider a WAF or rate-limit exemption.</td></tr>
+  <tr><td>Endpoint is public but IP restricted (firewall, security group, ingress allowlist)</td><td><strong>Yes, one rule:</strong> add our NAT IPs to the allowlist for the ports the script uses.</td></tr>
+  <tr><td>Endpoint is private (internal IP only)</td><td><strong>Opening a port does not help.</strong> Use Private Service Connect or Tailscale (below).</td></tr>
+</table>
+<p class="sub" style="margin-top:12px">So it is mandatory only when the app is IP restricted. The customer does not open a new port for us. They allow our source IPs on the ports the app already serves.</p>
 
 <!-- ============ DIAGRAM 2 ============ -->
 <h2>2. Private endpoints: Tailscale subnet router</h2>
@@ -258,12 +268,12 @@
   <text x="110" y="158" text-anchor="middle" class="s">scale horizontally</text>
 
   <rect x="232" y="112" width="176" height="64" rx="6" class="box"/>
-  <text x="320" y="140" text-anchor="middle" class="n">Interface endpoint</text>
-  <text x="320" y="158" text-anchor="middle" class="s">PrivateLink / PSC</text>
+  <text x="320" y="140" text-anchor="middle" class="n">PSC endpoint</text>
+  <text x="320" y="158" text-anchor="middle" class="s">AWS equivalent: PrivateLink</text>
 
   <rect x="632" y="112" width="176" height="64" rx="6" class="foc"/>
-  <text x="720" y="140" text-anchor="middle" class="n">Endpoint service + LB</text>
-  <text x="720" y="158" text-anchor="middle" class="s">customer approves us</text>
+  <text x="720" y="140" text-anchor="middle" class="n">Service attachment</text>
+  <text x="720" y="158" text-anchor="middle" class="s">+ ILB · customer approves</text>
 
   <rect x="840" y="112" width="160" height="64" rx="6" class="box"/>
   <text x="920" y="140" text-anchor="middle" class="n">App endpoints</text>
@@ -298,13 +308,36 @@
   </div>
 </div>
 
+<!-- ============ RECOMMENDATION ============ -->
+<h2>Recommended approach (we run on Google Cloud)</h2>
+<p class="sub">Pick by where the customer's endpoints live. Start with the simplest option that works.</p>
+<div class="grid">
+  <div class="card">
+    <b>1. Cloud NAT with static IPs (default)</b>
+    <p>Use for public endpoints, including IP-restricted ones. Reserve static external IPs and attach them to Cloud NAT with manual IP allocation, so the egress list never changes. Add enough IPs and ports per VM for the peak connection count. Publish the IPs to customers.</p>
+    <p><strong>Customer:</strong> allowlist our IPs on the ports the app already serves, only if the app is IP restricted.</p>
+  </div>
+  <div class="card">
+    <b>2. Private Service Connect (private GCP customers)</b>
+    <p>Use when the customer's app is private and also on Google Cloud. Best for heavy load, with no public internet and no IP allowlist.</p>
+    <p><strong>Customer:</strong> expose the app through an internal load balancer and a service attachment, then approve our PSC connection. PSC does not reach apps on AWS or on-prem.</p>
+  </div>
+  <div class="card">
+    <b>3. Tailscale subnet router (everything else)</b>
+    <p>Use for on-prem, AWS, or other clouds with private endpoints. Quick to set up and cloud neutral. Treat it as the fallback because the tunnel limits throughput.</p>
+    <p><strong>Customer:</strong> run a subnet router with outbound access only.</p>
+  </div>
+</div>
+<p class="sub" style="margin-top:16px">Skip Cloud Interconnect and Direct Connect. They need physical hardware and long lead times, so they are not worth it for load testing.</p>
+
 <!-- ============ COMPARISON ============ -->
 <h2>Which option when</h2>
 <table>
   <tr><th>Customer situation</th><th>Option</th><th>Customer opens</th><th>Scale</th></tr>
   <tr><td>Public endpoints, IP restricted</td><td>NAT egress (default)</td><td>Allow our NAT IPs on app ports</td><td>High, bounded by NAT IPs and ports</td></tr>
   <tr><td>Private, on-prem, or non AWS/GCP cloud</td><td>Tailscale subnet router</td><td>Outbound only from router</td><td>Medium, tunnel is the bottleneck</td></tr>
-  <tr><td>Private, app already in AWS or GCP</td><td>PrivateLink / PSC</td><td>Endpoint service + approval</td><td>Highest, extra per-GB cost</td></tr>
+  <tr><td>Private, app already on Google Cloud</td><td>Private Service Connect</td><td>Service attachment + approval</td><td>Highest, extra per-GB cost</td></tr>
+  <tr><td>Private, app on AWS</td><td>Tailscale (PrivateLink needs us on AWS)</td><td>Outbound only from router</td><td>Medium</td></tr>
   <tr><td>On-prem needing a dedicated line</td><td>Direct Connect / Interconnect</td><td>Physical circuit</td><td>Highest, but avoid: needs hardware</td></tr>
 </table>
 
